@@ -81,23 +81,33 @@ class JSONSchema(Schema):
     type = fields.Constant('object')
     required = fields.Method('get_required')
 
-    def get_properties(self, obj):
+    @classmethod
+    def _get_default_mapping(cls, obj):
+        """Return default mapping if there are no special needs."""
         mapping = {v: k for k, v in obj.TYPE_MAPPING.items()}
-        mapping[fields.Email] = text_type
-        mapping[fields.Dict] = dict
-        mapping[fields.List] = list
-        mapping[fields.Url] = text_type
-        mapping[fields.LocalDateTime] = datetime.datetime
+        mapping.update({
+            fields.Email: text_type,
+            fields.Dict: dict,
+            fields.Url: text_type,
+            fields.LocalDateTime: datetime.datetime,
+            fields.List: '_from_list',
+            fields.Nested: '_from_nested_schema',
+        })
+        return mapping
+
+    def get_properties(self, obj):
+        mapping = self.__class__._get_default_mapping(obj)
         properties = {}
 
         for field_name, field in sorted(obj.fields.items()):
             if hasattr(field, '_jsonschema_type_mapping'):
-                schema = field._jsonschema_type_mapping()
+                schema = field._jsonschema_type_mapping(obj)
             elif field.__class__ in mapping:
                 pytype = mapping[field.__class__]
-                schema = self.__class__._from_python_type(field, pytype)
-            elif isinstance(field, fields.Nested):
-                schema = self.__class__._from_nested_schema(field)
+                if isinstance(pytype, basestring):
+                    schema = getattr(self.__class__, pytype)(obj, field)
+                else:
+                    schema = self.__class__._from_python_type(field, pytype)
             else:
                 raise ValueError('unsupported field type %s' % field)
 
@@ -147,7 +157,26 @@ class JSONSchema(Schema):
         return json_schema
 
     @classmethod
-    def _from_nested_schema(cls, field):
+    def _from_list(cls, obj, field):
+        mapping = cls._get_default_mapping(obj)
+
+        if isinstance(field.container, basestring):
+            container = get_class(field.container)
+        else:
+            container = field.container
+
+        if container.__class__ in mapping:
+            pytype = mapping[container.__class__]
+            if isinstance(pytype, basestring):
+                inner_schema = getattr(cls, pytype)(obj, container)
+            else:
+                inner_schema = self.__class__._from_python_type(field, pytype)
+        outer_schema = TYPE_MAP[list]
+        outer_schema['items'] = inner_schema
+        return outer_schema
+
+    @classmethod
+    def _from_nested_schema(cls, obj, field):
         if isinstance(field.nested, basestring):
             nested = get_class(field.nested)
         else:

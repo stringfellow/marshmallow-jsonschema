@@ -57,6 +57,29 @@ def test_nested_descriptions():
     assert nested_dmp['title'] == 'Title1'
 
 
+def test_nested_in_list():
+    class TestSchema(Schema):
+        myfield = fields.String(metadata={'description': 'Brown Cow'})
+        yourfield = fields.Integer(required=True)
+
+    class TestNestedSchema(Schema):
+        nested_list = fields.List(
+            fields.Nested(
+                TestSchema,
+                metadata={'description': 'Nested 1', 'title': 'Title2'}
+            )
+        )
+        nested = fields.Nested(
+            TestSchema, metadata={'description': 'Nested 1', 'title': 'Title1'})
+
+    schema = TestNestedSchema()
+    json_schema = JSONSchema()
+    dumped = json_schema.dump(schema).data
+
+    # TODO FIXME: validation fails... need to pick up inner requireds?
+    _validate_schema(dumped)
+
+
 def test_nested_string_to_cls():
     class TestSchema(Schema):
         foo = fields.Integer(required=True)
