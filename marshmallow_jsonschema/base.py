@@ -142,18 +142,12 @@ class JSONSchema(Schema):
             json_schema['default'] = field.default
 
         # NOTE: doubled up to maintain backwards compatibility
-        metadata = field.metadata.pop('metadata', {})
+        metadata = field.metadata.get('metadata', {})
         metadata.update(field.metadata)
 
-        if metadata.get('description'):
-            json_schema['description'] = (
-                metadata.pop('description')
-            )
-
-        if metadata.get('title'):
-            json_schema['title'] = metadata.pop('title')
-
         for md_key, md_val in metadata.items():
+            if md_key == 'metadata':
+                continue
             json_schema[md_key] = md_val
 
         if isinstance(field, fields.List):
@@ -217,18 +211,12 @@ class JSONSchema(Schema):
         }
 
         # NOTE: doubled up to maintain backwards compatibility
-        metadata = field.metadata.pop('metadata', {})
+        metadata = field.metadata.get('metadata', {})
         metadata.update(field.metadata)
 
-        if metadata.get('description'):
-            schema['description'] = (
-                metadata.pop('description')
-            )
-
-        if metadata.get('title'):
-            schema['title'] = metadata.pop('title')
-
         for md_key, md_val in metadata.items():
+            if md_key == 'metadata':
+                continue
             schema[md_key] = md_val
 
         if field.many:
